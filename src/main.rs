@@ -83,9 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         loop {
                             match port.read(&mut buf) {
                                 Ok(t) => {
-                                    // clear terminal
-                                    println!("{}", String::from_utf8(buf[..t].to_vec()).unwrap());
-                                    
+                                    print!("{}", String::from_utf8(buf[..t].to_vec()).unwrap());
                                     //io::stdout().write_all(&mut buf[..t]);
                                 }
                                 Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
