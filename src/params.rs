@@ -9,7 +9,6 @@ pub struct Params {
     pub x_size: usize,
     pub y_size: usize,
     pub delimiter_element: String,
-    pub delimiter_block: String,
     pub n_elements: usize,
 }
 
@@ -20,7 +19,6 @@ impl Params {
             x_size: 50,
             y_size: 20,
             delimiter_element: ",".to_string(),
-            delimiter_block: "\r\n".to_string(),
             n_elements: 1,
         }
     }
@@ -44,7 +42,6 @@ impl Params {
                 "-xs" => { ret.x_size = args[count+1].parse().ok().unwrap(); }
                 "-ys" => { ret.y_size = args[count+1].parse().ok().unwrap(); }
                 "-de" => { ret.delimiter_element = args[count+1].to_string(); }
-                "-db" => { ret.delimiter_block = args[count+1].to_string(); }
                 "-ne" => { ret.n_elements = args[count+1].parse().ok().unwrap(); }
                 _ => {}
             }

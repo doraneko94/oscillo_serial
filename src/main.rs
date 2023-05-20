@@ -38,30 +38,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Ok(t) => {
                                     let mut new_data = false;
                                     let s = String::from_utf8(buf[..t].to_vec())?;
-                                    let blocks_len = s.split(&params.delimiter_block).count();
-                                    for (bi, block) in s.split(&params.delimiter_block).enumerate() {
-                                        s_save = s_save + &block;
-                                        if bi < blocks_len - 1 {
-                                            let elements_len = s_save.split(&params.delimiter_element).count();
-                                            if elements_len == params.n_elements {
-                                                let mut valid = true;
-                                                for (ei, elem) in s_save.split(&params.delimiter_element).enumerate() {
-                                                    match elem.parse().ok() {
-                                                        Some(val) => { data_tmp[ei] = val; }
-                                                        None => {
-                                                            valid = false;
-                                                            break;
-                                                        }
+                                    for block in s.lines() {    
+                                        s_save = s_save + block;
+                                        let elements_len = s_save.split(&params.delimiter_element).count();
+                                        if elements_len == params.n_elements {
+                                            let mut valid = true;
+                                            for (ei, elem) in s_save.split(&params.delimiter_element).enumerate() {
+                                                match elem.parse().ok() {
+                                                    Some(val) => { data_tmp[ei] = val; }
+                                                    None => {
+                                                        valid = false;
+                                                        break;
                                                     }
                                                 }
-                                                if valid {
-                                                    Zip::from(data.slice_mut(s![.., count%params.x_size]))
-                                                        .and(&data_tmp)
-                                                        .for_each(|a, &b| *a = b);
-                                                    count += 1;
-                                                    new_data = true;
-                                                }
                                             }
+                                            if valid {
+                                                Zip::from(data.slice_mut(s![.., count%params.x_size]))
+                                                    .and(&data_tmp)
+                                                    .for_each(|a, &b| *a = b);
+                                                count += 1;
+                                                new_data = true;
+                                            }
+                                            s_save = String::new();
+                                        }
+                                        else if elements_len > params.n_elements {
                                             s_save = String::new();
                                         }
                                     }
