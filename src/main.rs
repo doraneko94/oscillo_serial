@@ -1,4 +1,6 @@
-use std::io::{self, stdout, Read};
+use std::fs::{create_dir_all, File};
+use std::io::{self, stdout, BufWriter, Read, Write};
+use std::path::Path;
 
 use crossterm::{execute, terminal, cursor};
 use ndarray::*;
@@ -7,6 +9,9 @@ use oscillo_serial::exp::ManExp;
 use oscillo_serial::params::{Params, Mode};
 use oscillo_serial::plot::draw_line;
 use oscillo_serial::utils::min_max;
+use serialport::SerialPort;
+
+const BUF_SIZE: usize = 1024;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -25,44 +30,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .open()
         {
             Ok(mut port) => {
-                let mut buf = [0; 1024];
+                let mut buf = [0; BUF_SIZE];
                 match params.mode {
                     Mode::Dev => {}
                     Mode::Plot => {
                         let mut data: Array2<f32> = Array2::zeros((params.n_elements, params.x_size));
-                        let mut data_tmp: Array1<f32> = Array1::zeros(params.n_elements);
+                        let mut data_line: Array1<f32> = Array1::zeros(params.n_elements);
                         let mut count = 0;
-                        let mut s_save = String::new();
+                        let mut str_save = String::new();
                         loop {
                             match port.read(&mut buf) {
                                 Ok(t) => {
                                     let mut new_data = false;
                                     let s = String::from_utf8(buf[..t].to_vec())?;
                                     for block in s.lines() {    
-                                        s_save = s_save + block;
-                                        let elements_len = s_save.split(&params.delimiter_element).count();
+                                        str_save = str_save + block;
+                                        let elements_len = str_save.split(&params.delimiter_element).count();
                                         if elements_len == params.n_elements {
-                                            let mut valid = true;
-                                            for (ei, elem) in s_save.split(&params.delimiter_element).enumerate() {
-                                                match elem.parse().ok() {
-                                                    Some(val) => { data_tmp[ei] = val; }
-                                                    None => {
-                                                        valid = false;
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            if valid {
+                                            if validate_elements(&str_save, &mut data_line, &params.delimiter_element) {
                                                 Zip::from(data.slice_mut(s![.., count%params.x_size]))
-                                                    .and(&data_tmp)
+                                                    .and(&data_line)
                                                     .for_each(|a, &b| *a = b);
                                                 count += 1;
                                                 new_data = true;
                                             }
-                                            s_save = String::new();
+                                            str_save = String::new();
                                         }
                                         else if elements_len > params.n_elements {
-                                            s_save = String::new();
+                                            str_save = String::new();
                                         }
                                     }
                                     if new_data {
@@ -85,6 +80,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 Ok(t) => {
                                     print!("{}", String::from_utf8(buf[..t].to_vec()).unwrap());
                                     //io::stdout().write_all(&mut buf[..t]);
+                                }
+                                Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
+                                Err(e) => return Err(e.into()),
+                            }
+                        }
+                    }
+                    Mode::CSV => {
+                        let output_dir = Path::new("out");
+                        create_dir_all(&output_dir)?;
+                        let mut w = BufWriter::new(File::create(output_dir.join("test.csv")).unwrap());
+
+                        let mut data_line: Array1<f32> = Array1::zeros(params.n_elements);
+                        let mut str_save = String::new();
+                        loop {
+                            match port.read(&mut buf) {
+                                Ok(t) => {
+                                    let s = String::from_utf8(buf[..t].to_vec())?;
+                                    for block in s.lines() {    
+                                        str_save = str_save + block;
+                                        let elements_len = str_save.split(&params.delimiter_element).count();
+                                        if elements_len == params.n_elements {
+                                            if validate_elements(&str_save, &mut data_line, &params.delimiter_element) {
+                                                for ei in 0..elements_len-1 {
+                                                    let _ = write!(w, "{},", data_line[ei]);
+                                                }
+                                                let _ = writeln!(w, "{}", data_line[elements_len - 1]);
+                                                println!("{:?}", &data_line);
+                                            }
+                                            str_save = String::new();
+                                        }
+                                        else if elements_len > params.n_elements {
+                                            str_save = String::new();
+                                        }
+                                    }
                                 }
                                 Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
                                 Err(e) => return Err(e.into()),
@@ -217,4 +246,18 @@ fn update(data: &Array2<f32>, count: usize, y_size: usize) -> Result<(), Box<dyn
         println!("{}", s);
     }
     Ok(())
+}
+
+fn validate_elements(str_save: &str, data_line: &mut Array1<f32>, delimiter: &str) -> bool {
+    let mut valid = true;
+    for (ei, elem) in str_save.split(delimiter).enumerate() {
+        match elem.parse().ok() {
+            Some(val) => { data_line[ei] = val; }
+            None => {
+                valid = false;
+                break;
+            }
+        }
+    }
+    valid
 }

@@ -1,6 +1,7 @@
 pub enum Mode {
     Plot,
     Text,
+    CSV,
     Dev,
 }
 
@@ -35,6 +36,7 @@ impl Params {
                     match args[count+1].as_str() {
                         "plot" => { ret.mode = Mode::Plot; }
                         "text" => { ret.mode = Mode::Text; }
+                        "csv" => { ret.mode = Mode::CSV; }
                         "dev" => { ret.mode = Mode::Dev; }
                         _ => {}
                     }
